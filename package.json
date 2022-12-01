@@ -40,5 +40,13 @@
         "tsx": "^3.12.1",
         "typedoc": "^0.23.21",
         "typescript": "^4.9.3"
-    }
+    },
+    "repository": {
+        "type": "git",
+        "url": "https://github.com/JacobLinCool/typed-neo4j.git"
+    },
+    "bugs": {
+        "url": "https://github.com/JacobLinCool/typed-neo4j/issues"
+    },
+    "homepage": "https://jacoblincool.github.io/typed-neo4j/"
 }
