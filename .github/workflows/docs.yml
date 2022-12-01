@@ -1,0 +1,31 @@
+name: Docs
+
+on:
+  push:
+    branches:
+      - main
+  workflow_dispatch:
+
+jobs:
+  docs:
+    name: docs
+    runs-on: ubuntu-latest
+
+    steps:
+      - name: Checkout Repository
+        uses: actions/checkout@v3
+
+      - name: Setup PNPM
+        uses: pnpm/action-setup@v2.2.4
+        with:
+          version: latest
+          run_install: true
+
+      - name: Build Docs
+        run: pnpm run docs
+
+      - name: Deploy
+        uses: peaceiris/actions-gh-pages@v3
+        with:
+          github_token: ${{ secrets.GITHUB_TOKEN  }}
+          publish_dir: "./docs"
