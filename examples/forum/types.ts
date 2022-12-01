@@ -46,7 +46,7 @@ export interface EdgeSchema {
     WROTE: {
         from: User;
         to: Post;
-        props: {};
+        props: Record<string, never>;
     };
     TAGGED: {
         from: Post;
@@ -58,6 +58,6 @@ export interface EdgeSchema {
     IN: {
         from: Post;
         to: Forum;
-        props: {};
+        props: Record<string, never>;
     };
 }

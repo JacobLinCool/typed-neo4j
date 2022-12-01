@@ -11,11 +11,11 @@ export interface Edge {
 export type EdgeSchema<
     VF extends Omit<Vertex, "$id"> = Omit<Vertex, "$id">,
     VT extends Omit<Vertex, "$id"> = Omit<Vertex, "$id">,
-    P extends Record<string, any> = Record<string, any>,
+    P extends Record<string, unknown> = Record<string, unknown>,
 > = {
     from: VF;
     to: VT;
-    props: P;
+    props?: P;
 };
 
 export type VertexFrom<ES> = ES extends EdgeSchema ? ES["from"] : never;

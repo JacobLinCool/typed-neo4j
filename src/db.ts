@@ -7,9 +7,9 @@ import { convert } from "./convert";
 const log = debug("db");
 
 export class DB<
-    VertexSchema extends Omit<Record<string, Record<string, any>>, string> = Record<
+    VertexSchema extends Omit<Record<string, Record<string, unknown>>, string> = Record<
         string,
-        Record<string, any>
+        Record<string, unknown>
     >,
     EdgeSchema extends Omit<Record<string, ES>, string> = Record<string, ES>,
 > {
@@ -19,7 +19,7 @@ export class DB<
         this.session = driver.session({ database });
     }
 
-    async run(query: string, params?: Record<string, any>): Promise<Result> {
+    async run(query: string, params?: Record<string, unknown>): Promise<Result> {
         log(query, params);
         const result = await this.session.run(query, params);
         log(result);
@@ -34,7 +34,7 @@ export class DB<
         await this.run("MATCH (n) DETACH DELETE n");
     }
 
-    async create<T extends Record<string, any>, V extends keyof VertexSchema>(
+    async create<T extends Record<string, unknown>, V extends keyof VertexSchema>(
         label: V,
         props: V extends keyof VertexSchema ? VertexSchema[V] | VertexSchema[V][] : T | T[],
     ): Promise<(Vertex & (V extends keyof VertexSchema ? VertexSchema[V] : T))[]> {
@@ -50,10 +50,10 @@ export class DB<
         return items.map((item) => ({
             $id: item.elementId,
             ...item.properties,
-        })) as any[];
+        })) as (Vertex & (V extends keyof VertexSchema ? VertexSchema[V] : T))[];
     }
 
-    async find<T extends Record<string, any>, V extends keyof VertexSchema>(
+    async find<T extends Record<string, unknown>, V extends keyof VertexSchema>(
         label: V,
         props: V extends keyof VertexSchema
             ? Partial<VertexSchema[V]>
@@ -87,7 +87,7 @@ export class DB<
         return items.map((item) => ({
             $id: item.elementId,
             ...item.properties,
-        })) as any[];
+        })) as (Vertex & (V extends keyof VertexSchema ? VertexSchema[V] : T))[];
     }
 
     async fetch<V extends VertexSchema[keyof VertexSchema]>(
@@ -99,14 +99,14 @@ export class DB<
 
         const item = result.records[0].get("n");
 
-        return { $id: item.elementId, ...item.properties } as any;
+        return { $id: item.elementId, ...item.properties };
     }
 
     async update<V extends VertexSchema[keyof VertexSchema]>(
         vertex: Vertex & V,
         props: V,
     ): Promise<Vertex & V> {
-        const keys = Object.keys(props as Record<string, any>);
+        const keys = Object.keys(props as Record<string, unknown>);
         props = convert.neo4j(props);
 
         const result = await this.run(
@@ -118,11 +118,11 @@ export class DB<
 
         const item = result.records[0].get("n");
 
-        return { $id: item.elementId, ...item.properties } as any;
+        return { $id: item.elementId, ...item.properties };
     }
 
     async link<
-        T extends Record<string, any>,
+        T extends Record<string, unknown>,
         E extends keyof EdgeSchema,
         VF extends VertexFrom<EdgeSchema[E]> & Vertex,
         VT extends VertexTo<EdgeSchema[E]> & Vertex,
@@ -134,7 +134,7 @@ export class DB<
             ? EdgeProps<EdgeSchema[E]>
             : T = {} as E extends keyof EdgeSchema ? EdgeProps<EdgeSchema[E]> : T,
     ): Promise<void> {
-        const keys = Object.keys(props);
+        const keys = Object.keys(props || {});
         props = convert.neo4j(props);
 
         await this.run(

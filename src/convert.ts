@@ -1,3 +1,4 @@
+/* eslint-disable @typescript-eslint/no-explicit-any */
 import { types } from "neo4j-driver";
 
 export const convert = {
