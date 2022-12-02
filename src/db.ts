@@ -127,7 +127,7 @@ export class DB<
         VF extends VertexFrom<EdgeSchema[E]> & Vertex,
         VT extends VertexTo<EdgeSchema[E]> & Vertex,
     >(
-        source: VF,
+        source: VF | VF[],
         rel: E,
         targets: VT | VT[],
         props: E extends keyof EdgeSchema
@@ -138,11 +138,11 @@ export class DB<
         props = convert.neo4j(props);
 
         await this.run(
-            `UNWIND $targets AS target MATCH (s), (t) WHERE elementId(s) = $source AND elementId(t) = target CREATE (s)-[:${String(
+            `UNWIND $sources AS source UNWIND $targets AS target MATCH (s) WHERE elementId(s) = source MATCH (t) WHERE elementId(t) = target CREATE (s)-[:${String(
                 rel,
             )} { ${keys.map((key) => `${key}: $${key}`).join(", ")} }]->(t)`,
             {
-                source: source.$id,
+                sources: Array.isArray(source) ? source.map((s) => s.$id) : [source.$id],
                 targets: Array.isArray(targets) ? targets.map((t) => t.$id) : [targets.$id],
                 ...props,
             },
