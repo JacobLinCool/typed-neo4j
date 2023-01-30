@@ -1,11 +1,22 @@
 ---
 printWidth: 100
 tabWidth: 4
-useTabs: false
+useTabs: true
 trailingComma: all
 semi: true
 singleQuote: false
+
 overrides:
-  - files: "*.{md,yml,yaml}"
-    options:
-      tabWidth: 2
+    - files: "*.md"
+      options:
+          useTabs: false
+
+plugins:
+    - ./node_modules/@trivago/prettier-plugin-sort-imports/lib/src/index.js
+pluginSearchDirs: false
+
+importOrder:
+    - "^node:"
+    - "^[^@.]"
+    - "^@"
+    - "^\\."
