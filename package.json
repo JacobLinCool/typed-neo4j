@@ -1,6 +1,6 @@
 {
 	"name": "typed-neo4j",
-	"version": "0.1.0",
+	"version": "0.1.1",
 	"description": "Neo4j driver with customizable schema for vertex and edge.",
 	"keywords": [],
 	"author": "JacobLinCool <jacoblincool@gmail.com> (https://github.com/JacobLinCool)",
