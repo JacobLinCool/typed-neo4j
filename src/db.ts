@@ -1,151 +1,184 @@
 import debug from "debug";
 import { Result, Session, Node } from "neo4j-driver";
-import { Vertex, EdgeSchema as ES, VertexFrom, VertexTo, EdgeProps } from "./types";
-import { driver } from "./driver";
 import { convert } from "./convert";
+import { driver } from "./driver";
+import { Vertex, EdgeSchema as ES, VertexFrom, VertexTo, EdgeProps } from "./types";
 
 const log = debug("db");
 
 export class DB<
-    VertexSchema extends Omit<Record<string, Record<string, unknown>>, string> = Record<
-        string,
-        Record<string, unknown>
-    >,
-    EdgeSchema extends Omit<Record<string, ES>, string> = Record<string, ES>,
+	VertexSchema extends Omit<Record<string, Record<string, unknown>>, string> = Record<
+		string,
+		Record<string, unknown>
+	>,
+	EdgeSchema extends Omit<Record<string, ES>, string> = Record<string, ES>,
 > {
-    private readonly session: Session;
+	public readonly session: Session;
 
-    constructor(database = "neo4j") {
-        this.session = driver.session({ database });
-    }
+	constructor(database = "neo4j") {
+		this.session = driver.session({ database });
+	}
 
-    async run(query: string, params?: Record<string, unknown>): Promise<Result> {
-        log(query, params);
-        const result = await this.session.run(query, params);
-        log(result);
-        return result;
-    }
+	async run(query: string, params?: Record<string, unknown>): Promise<Result> {
+		log(query, params);
+		const result = await this.session.run(query, params);
+		log(result);
+		return result;
+	}
 
-    async close(): Promise<void> {
-        await this.session.close();
-    }
+	async query<
+		V extends {
+			[key: string]: VertexSchema[keyof VertexSchema] | VertexSchema[keyof VertexSchema][];
+		},
+	>(
+		query: string,
+		params: Record<string, unknown>,
+	): Promise<
+		{
+			[K in keyof V]: V[K] extends VertexSchema[keyof VertexSchema][]
+				? (Vertex & V[K][number])[]
+				: Vertex & V[K];
+		}[]
+	> {
+		const result = await this.run(query, params);
 
-    async reset(): Promise<void> {
-        await this.run("MATCH (n) DETACH DELETE n");
-    }
+		const results = result.records.map((record) => {
+			const rec = {} as any;
+			for (const key of record.keys) {
+				const item = record.get(key);
+				log(key, item);
+				if (Array.isArray(item)) {
+					rec[key] = item.map((i) => ({ $id: i.elementId, ...convert.js(i.properties) }));
+				} else {
+					rec[key] = { $id: item.elementId, ...convert.js(item.properties) };
+				}
+			}
+			return rec;
+		});
 
-    async create<T extends Record<string, unknown>, V extends keyof VertexSchema>(
-        label: V,
-        props: V extends keyof VertexSchema ? VertexSchema[V] | VertexSchema[V][] : T | T[],
-    ): Promise<(Vertex & (V extends keyof VertexSchema ? VertexSchema[V] : T))[]> {
-        props = convert.neo4j(props);
+		return results;
+	}
 
-        const results = await this.run(
-            `UNWIND $props AS props CREATE (n:${String(label)}) SET n = props RETURN n`,
-            { props: Array.isArray(props) ? props : [props] },
-        );
+	async close(): Promise<void> {
+		await this.session.close();
+	}
 
-        const items: Node[] = results.records.map((record) => record.get("n"));
+	async reset(): Promise<void> {
+		await this.run("MATCH (n) DETACH DELETE n");
+	}
 
-        return items.map((item) => ({
-            $id: item.elementId,
-            ...item.properties,
-        })) as (Vertex & (V extends keyof VertexSchema ? VertexSchema[V] : T))[];
-    }
+	async create<T extends Record<string, unknown>, V extends keyof VertexSchema>(
+		label: V,
+		props: V extends keyof VertexSchema ? VertexSchema[V] | VertexSchema[V][] : T | T[],
+	): Promise<(Vertex & (V extends keyof VertexSchema ? VertexSchema[V] : T))[]> {
+		props = convert.neo4j(props);
 
-    async find<T extends Record<string, unknown>, V extends keyof VertexSchema>(
-        label: V,
-        props: V extends keyof VertexSchema
-            ? Partial<VertexSchema[V]>
-            : T = {} as V extends keyof VertexSchema ? Partial<VertexSchema[V]> : T,
-        config: {
-            limit?: number;
-            skip?: number;
-            order?: { [key in keyof T]?: "asc" | "desc" };
-        } = {},
-    ): Promise<(Vertex & (V extends keyof VertexSchema ? VertexSchema[V] : T))[]> {
-        const keys = Object.keys(props);
-        props = convert.neo4j(props);
+		const results = await this.run(
+			`UNWIND $props AS props CREATE (n:${String(label)}) SET n = props RETURN n`,
+			{ props: Array.isArray(props) ? props : [props] },
+		);
 
-        const results = await this.run(
-            `MATCH (n:${String(label)} { ${keys
-                .map((key) => `${key}: $${key}`)
-                .join(", ")} }) RETURN n ${
-                config.order
-                    ? `ORDER BY ${Object.entries(config.order)
-                          .map(([key, order]) => `n.${key} ${order}`)
-                          .join(", ")}`
-                    : ""
-            } ${config.limit ? `LIMIT ${config.limit}` : ""} ${
-                config.skip ? `SKIP ${config.skip}` : ""
-            }`,
-            props,
-        );
+		const items: Node[] = results.records.map((record) => record.get("n"));
 
-        const items: Node[] = results.records.map((record) => record.get("n"));
+		return items.map((item) => ({
+			$id: item.elementId,
+			...item.properties,
+		})) as (Vertex & (V extends keyof VertexSchema ? VertexSchema[V] : T))[];
+	}
 
-        return items.map((item) => ({
-            $id: item.elementId,
-            ...item.properties,
-        })) as (Vertex & (V extends keyof VertexSchema ? VertexSchema[V] : T))[];
-    }
+	async find<T extends Record<string, unknown>, V extends keyof VertexSchema>(
+		label: V,
+		props: V extends keyof VertexSchema
+			? Partial<VertexSchema[V]>
+			: T = {} as V extends keyof VertexSchema ? Partial<VertexSchema[V]> : T,
+		config: {
+			limit?: number;
+			skip?: number;
+			order?: { [key in keyof T]?: "asc" | "desc" };
+		} = {},
+	): Promise<(Vertex & (V extends keyof VertexSchema ? VertexSchema[V] : T))[]> {
+		const keys = Object.keys(props);
+		props = convert.neo4j(props);
 
-    async fetch<V extends VertexSchema[keyof VertexSchema]>(
-        vertex: Vertex & Partial<V>,
-    ): Promise<Vertex & V> {
-        const result = await this.run(`MATCH (n) WHERE elementId(n) = $id RETURN n`, {
-            id: vertex.$id,
-        });
+		const results = await this.run(
+			`MATCH (n:${String(label)} { ${keys
+				.map((key) => `${key}: $${key}`)
+				.join(", ")} }) RETURN n ${
+				config.order
+					? `ORDER BY ${Object.entries(config.order)
+							.map(([key, order]) => `n.${key} ${order}`)
+							.join(", ")}`
+					: ""
+			} ${config.limit ? `LIMIT ${config.limit}` : ""} ${
+				config.skip ? `SKIP ${config.skip}` : ""
+			}`,
+			props,
+		);
 
-        const item = result.records[0].get("n");
+		const items: Node[] = results.records.map((record) => record.get("n"));
 
-        return { $id: item.elementId, ...item.properties };
-    }
+		return items.map((item) => ({
+			$id: item.elementId,
+			...item.properties,
+		})) as (Vertex & (V extends keyof VertexSchema ? VertexSchema[V] : T))[];
+	}
 
-    async update<V extends VertexSchema[keyof VertexSchema]>(
-        vertex: Vertex & V,
-        props: V,
-    ): Promise<Vertex & V> {
-        const keys = Object.keys(props as Record<string, unknown>);
-        props = convert.neo4j(props);
+	async fetch<V extends VertexSchema[keyof VertexSchema]>(
+		vertex: Vertex & Partial<V>,
+	): Promise<Vertex & V> {
+		const result = await this.run(`MATCH (n) WHERE elementId(n) = $id RETURN n`, {
+			id: vertex.$id,
+		});
 
-        const result = await this.run(
-            `MATCH (n) WHERE elementId(n) = $id SET n = { ${keys
-                .map((key) => `${key}: $${key}`)
-                .join(", ")} } RETURN n`,
-            { id: vertex.$id, ...props },
-        );
+		const item = result.records[0].get("n");
 
-        const item = result.records[0].get("n");
+		return { $id: item.elementId, ...item.properties };
+	}
 
-        return { $id: item.elementId, ...item.properties };
-    }
+	async update<V extends VertexSchema[keyof VertexSchema]>(
+		vertex: Vertex & V,
+		props: V,
+	): Promise<Vertex & V> {
+		const keys = Object.keys(props as Record<string, unknown>);
+		props = convert.neo4j(props);
 
-    async link<
-        T extends Record<string, unknown>,
-        E extends keyof EdgeSchema,
-        VF extends VertexFrom<EdgeSchema[E]> & Vertex,
-        VT extends VertexTo<EdgeSchema[E]> & Vertex,
-    >(
-        source: VF | VF[],
-        rel: E,
-        targets: VT | VT[],
-        props: E extends keyof EdgeSchema
-            ? EdgeProps<EdgeSchema[E]>
-            : T = {} as E extends keyof EdgeSchema ? EdgeProps<EdgeSchema[E]> : T,
-    ): Promise<void> {
-        const keys = Object.keys(props || {});
-        props = convert.neo4j(props);
+		const result = await this.run(
+			`MATCH (n) WHERE elementId(n) = $id SET n = { ${keys
+				.map((key) => `${key}: $${key}`)
+				.join(", ")} } RETURN n`,
+			{ id: vertex.$id, ...props },
+		);
 
-        await this.run(
-            `UNWIND $sources AS source UNWIND $targets AS target MATCH (s) WHERE elementId(s) = source MATCH (t) WHERE elementId(t) = target CREATE (s)-[:${String(
-                rel,
-            )} { ${keys.map((key) => `${key}: $${key}`).join(", ")} }]->(t)`,
-            {
-                sources: Array.isArray(source) ? source.map((s) => s.$id) : [source.$id],
-                targets: Array.isArray(targets) ? targets.map((t) => t.$id) : [targets.$id],
-                ...props,
-            },
-        );
-    }
+		const item = result.records[0].get("n");
+
+		return { $id: item.elementId, ...item.properties };
+	}
+
+	async link<
+		T extends Record<string, unknown>,
+		E extends keyof EdgeSchema,
+		VF extends VertexFrom<EdgeSchema[E]> & Vertex,
+		VT extends VertexTo<EdgeSchema[E]> & Vertex,
+	>(
+		source: VF | VF[],
+		rel: E,
+		targets: VT | VT[],
+		props: E extends keyof EdgeSchema
+			? EdgeProps<EdgeSchema[E]>
+			: T = {} as E extends keyof EdgeSchema ? EdgeProps<EdgeSchema[E]> : T,
+	): Promise<void> {
+		const keys = Object.keys(props || {});
+		props = convert.neo4j(props);
+
+		await this.run(
+			`UNWIND $sources AS source UNWIND $targets AS target MATCH (s) WHERE elementId(s) = source MATCH (t) WHERE elementId(t) = target CREATE (s)-[:${String(
+				rel,
+			)} { ${keys.map((key) => `${key}: $${key}`).join(", ")} }]->(t)`,
+			{
+				sources: Array.isArray(source) ? source.map((s) => s.$id) : [source.$id],
+				targets: Array.isArray(targets) ? targets.map((t) => t.$id) : [targets.$id],
+				...props,
+			},
+		);
+	}
 }
