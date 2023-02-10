@@ -35,7 +35,7 @@
 		"@types/node-fetch": "^2.6.2",
 		"@typescript-eslint/eslint-plugin": "^5.49.0",
 		"@typescript-eslint/parser": "^5.49.0",
-		"course-pack": "1.0.0-alpha.12",
+		"course-pack": "1.0.0-alpha.15",
 		"eslint": "^8.33.0",
 		"eslint-config-prettier": "^8.6.0",
 		"husky": "^8.0.3",
